@@ -3,7 +3,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.Socket;
 import java.net.UnknownHostException;
-
+import java.util.HashMap;
 
 public class PhysLayerClient {
 	public enum Signal {UP, DOWN}
@@ -30,8 +30,9 @@ public class PhysLayerClient {
 			for (int j = 0; j < decoded.length; ++j){
 				System.out.println(j + ":" + Integer.toHexString(decoded[j] & 0xFF));
 			}
-			
 			convert5B4B(decoded);
+			
+			
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -56,13 +57,36 @@ public class PhysLayerClient {
 			}
 		}
 	}
+	/**
+	 * convert 5B table to 4B
+	 * @param decoded
+	 */
 	public static void convert5B4B(byte[] decoded){
-		byte fiveBitTable[] = {30, 9, 20, 21, 10, 11, 14, 15,
-				18, 19, 22, 23, 26, 27, 28, 29};
+/*		byte fiveBitTable[] = {30, 9, 20, 21, 10, 11, 14, 15,
+				18, 19, 22, 23, 26, 27, 28, 29};*/
+		HashMap<Integer, Integer> fourBitToFiveBit = new HashMap<Integer ,Integer>(){{
+			put(30, 0);
+			put(9, 1);
+			put(20, 2);
+			put(21, 3);
+			put(10, 4);
+			put(11, 5);
+			put(14, 6);
+			put(15, 7);
+			put(18, 8);
+			put(19, 9);
+			put(22, 10);
+			put(23, 11);
+			put(26, 12);
+			put(27, 13);
+			put(28, 14);
+			put(29, 15);
+		}};
+		int hold;
 		for (int i = 0; i < decoded.length; ++i){
-			
+			hold = fourBitToFiveBit.get(decoded[i]);
+			decoded[i] = (byte) hold;
 		}
-		
 	}
 	
 }
