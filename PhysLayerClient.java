@@ -8,7 +8,6 @@ import java.util.HashMap;
 public class PhysLayerClient {
 	public enum Signal {UP, DOWN}
 	boolean start = false;
-	Signal sign = Signal.DOWN;
 	
 	public static void main(String args[]) throws IOException{
 		byte[] bitStorage = new byte[512];
@@ -94,6 +93,43 @@ public class PhysLayerClient {
 			bitStorage[arrSlot++] = receiver;
 			
 		}
+	}
+	public static void decodeNRZI(byte[] bitStorage){
+		Signal sign;
+		byte decoded = 0;
+		for (int i = 0; i < bitStorage.length; ++i){
+			sign = Signal.DOWN;
+			//iter 1
+			if ((bitStorage[i] >> 4) == 1){
+				sign = Signal.UP;
+				decoded |= 0x10;
+			}
+			else if((bitStorage[i] >> 4) == 0){
+				sign = Signal.DOWN;
+				decoded |= 0x0;
+			}
+			
+			bitStorage[i] &= 0x0F;
+			//iter 2
+			if ((bitStorage[i] >> 3) == 1 && sign == Signal.UP){	// not needed?, add 0 to 4th
+		//		decoded |= 0x10;	
+			}
+			else if ((bitStorage[i] >> 3) == 0 && sign == Signal.UP){	// add 1 to 4th, signal flip
+				decoded |= 0x8;
+				sign = Signal.DOWN;
+			}
+			else if ((bitStorage[i] >> 3) == 1 && sign == Signal.DOWN){ // add 1 to 4th, signal flip
+				decoded |= 0x8;
+				sign = Signal.UP;
+			}
+			else if ((bitStorage[i] >> 3) == 0 && sign == Signal.DOWN){ // add 0 to 4th, stays down
+		//		decoded |= 0x10;	
+			}
+		}
+	}
+	public static int checkNRZI(byte bit, byte[] bitStorage, Signal sign){
+		
+		return 0;
 	}
 /*	public static void get5BNRZI(InputStream is, byte[] bitStorage) throws IOException {
 		int digits = 0, arrSlot = 0;
