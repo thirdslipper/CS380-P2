@@ -11,7 +11,7 @@ public class PhysLayerClient {
 	Signal sign = Signal.DOWN;
 	
 	public static void main(String args[]) throws IOException{
-		byte[] decoded = new byte[512];
+		byte[] bitStorage = new byte[512];
 		
 		try (Socket socket = new Socket("codebank.xyz", 38002)){
 			System.out.println("Connected to: " + socket.getInetAddress() + ":" + socket.getPort() + "\n");
@@ -26,27 +26,33 @@ public class PhysLayerClient {
 			}
 			System.out.println("Baseline: " + (baseline /= 64));
 			
-			get5BNRZI(is, decoded);
-			for (int j = 0; j < decoded.length; ++j){
-				System.out.println(j + ":" + Integer.toHexString(decoded[j] & 0xFF));
-			}
-			convert5B4B(decoded);
+			get5BNRZI(is, bitStorage);
+/*			for (int j = 0; j < bitStorage.length; ++j){
+				System.out.println(j + ":" + Integer.toBinaryString(bitStorage[j] & 0xFF));
+			}*/
+			convert5B4B(bitStorage);
 			
 			
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
 	}
-	public static void get5BNRZI(InputStream is, byte[] decoded) throws IOException {
+	public static void get5BNRZI(InputStream is, byte[] bitStorage) throws IOException {
 		int digits = 0, arrSlot = 0;
 		short fiveBitStorage = 0;
+		byte received = 0;
 		
-		for (int j = 0; j < 320; ++j){
-			fiveBitStorage = (short) (fiveBitStorage | is.read());
+		for (int j = 0; j < 5; ++j){	// incoming 320bytes
+			received = (byte) is.read();
+			fiveBitStorage = (short) (fiveBitStorage | received);
+System.out.println(Integer.toBinaryString(fiveBitStorage & 0xFF) + "  " + Integer.toBinaryString(received & 0xFF));
 			digits += 8;
 			
 			while (digits / 5 > 0){	// never more than 4 bits long after loop, shift remainder to left 8 bits
-				decoded[arrSlot++] = (byte) (fiveBitStorage >> (digits - 5));	// get the five bit representation of the byte to be converted
+				System.out.println("digits : " + digits);
+				bitStorage[arrSlot] = (byte) (fiveBitStorage >> (digits - 5));	// get the five bit representation of the byte to be converted
+				System.out.println("storing: " +  Integer.toBinaryString(bitStorage[arrSlot] & 0xFF));
+				arrSlot++;
 				if (fiveBitStorage > 15 && fiveBitStorage < 65536){		// 1 0000 - 0111 1111 1111 1111
 					fiveBitStorage <<= (16-(digits-4));
 				}
@@ -59,9 +65,9 @@ public class PhysLayerClient {
 	}
 	/**
 	 * convert 5B table to 4B
-	 * @param decoded
+	 * @param bitStorage
 	 */
-	public static void convert5B4B(byte[] decoded){
+	public static void convert5B4B(byte[] bitStorage){
 /*		byte fiveBitTable[] = {30, 9, 20, 21, 10, 11, 14, 15,
 				18, 19, 22, 23, 26, 27, 28, 29};*/
 		HashMap<Integer, Integer> fourBitToFiveBit = new HashMap<Integer ,Integer>(){{
@@ -83,16 +89,16 @@ public class PhysLayerClient {
 			put(29, 15);
 		}};
 		int hold;
-		for (int i = 0; i < decoded.length; ++i){
-			hold = fourBitToFiveBit.get(decoded[i]);
-			decoded[i] = (byte) hold;
+		for (int i = 0; i < bitStorage.length; ++i){
+			hold = fourBitToFiveBit.get(bitStorage[i]);
+			bitStorage[i] = (byte) hold;
 		}
 	}
 	
 }
 
 				
-/*				if (fiveBitStorage == 0){// gets 2^exponent, 0-7
+/*				if (fivebitStorage == 0){// gets 2^exponent, 0-7
 					digits = 0;
 				}
 				else{
