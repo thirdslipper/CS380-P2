@@ -14,29 +14,30 @@ public class PhysLayerClient {
 		byte[] bitStorage = new byte[512];
 		
 		try (Socket socket = new Socket("codebank.xyz", 38002)){
-			System.out.println("Connected to: " + socket.getInetAddress() + ":" + socket.getPort() + "\n");
+//			System.out.println("Connected to: " + socket.getInetAddress() + ":" + socket.getPort() + "\n");
 			
 			OutputStream os = socket.getOutputStream();
 			InputStream is = socket.getInputStream();
 			
 			double baseline = 0;
-			//Preamble baseline
 			for (int i = 0; i < 64; ++i){
 				baseline += is.read();
 			}
-			System.out.println("Baseline: " + (baseline /= 64));
+//			System.out.println("Baseline: " + (baseline /= 64));
 			
 			get5BNRZI(is, bitStorage);
 /*			for (int j = 0; j < bitStorage.length; ++j){
-				System.out.println(j + ":" + Integer.toBinaryString(bitStorage[j] & 0xFF));
+				System.out.println(j + ":" + Integer.toBinaryString(bitStorage[j] & 0x1F));
 			}*/
-			convert5B4B(bitStorage);
+			
+//			convert5B4B(bitStorage);
 			
 			
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
 	}
+	
 	public static void get5BNRZI(InputStream is, byte[] bitStorage) throws IOException {
 		int digits = 0, arrSlot = 0;
 		short fiveBitStorage = 0;
@@ -45,20 +46,25 @@ public class PhysLayerClient {
 		for (int j = 0; j < 5; ++j){	// incoming 320bytes
 			received = (byte) is.read();
 			fiveBitStorage = (short) (fiveBitStorage | received);
-System.out.println(Integer.toBinaryString(fiveBitStorage & 0xFF) + "  " + Integer.toBinaryString(received & 0xFF));
+	//		System.out.println(Integer.toBinaryString(fiveBitStorage & 0xFF) + "  " + Integer.toBinaryString(received & 0xFF));
 			digits += 8;
 			
 			while (digits / 5 > 0){	// never more than 4 bits long after loop, shift remainder to left 8 bits
-				System.out.println("digits : " + digits);
-				bitStorage[arrSlot] = (byte) (fiveBitStorage >> (digits - 5));	// get the five bit representation of the byte to be converted
-				System.out.println("storing: " +  Integer.toBinaryString(bitStorage[arrSlot] & 0xFF));
-				arrSlot++;
+	//			System.out.println("digits : " + digits);
+				
+				bitStorage[arrSlot++] = (byte) (fiveBitStorage >> (digits - 5));	// get the five bit representation of the byte to be converted
+				
+	//			System.out.println("storing: " +  Integer.toBinaryString(bitStorage[arrSlot] & 0x1F));
+				System.out.println(fiveBitStorage & 0xFF);
 				if (fiveBitStorage > 15 && fiveBitStorage < 65536){		// 1 0000 - 0111 1111 1111 1111
-					fiveBitStorage <<= (16-(digits-4));
+					fiveBitStorage <<= (20-(digits));
+					System.out.println("in");
 				}
-				else if (fiveBitStorage < 16 && fiveBitStorage >= 0){	// 0 - 1111 
+				else if (fiveBitStorage < 16 && fiveBitStorage >= 0){	// 0 - 1111  
 					fiveBitStorage <<= (15-digits);
+					System.out.println("out");
 				}
+	//			System.out.println("new fbs: " + Integer.toBinaryString(fiveBitStorage & 0x1F));
 				digits -= 5;
 			}
 		}
