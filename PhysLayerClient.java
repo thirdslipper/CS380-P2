@@ -14,7 +14,7 @@ public class PhysLayerClient {
 		byte[] bitStorage = new byte[512];
 		
 		try (Socket socket = new Socket("codebank.xyz", 38002)){
-//			System.out.println("Connected to: " + socket.getInetAddress() + ":" + socket.getPort() + "\n");
+			System.out.println("Connected to: " + socket.getInetAddress() + ":" + socket.getPort() + "\n");
 			
 			OutputStream os = socket.getOutputStream();
 			InputStream is = socket.getInputStream();
@@ -23,22 +23,79 @@ public class PhysLayerClient {
 			for (int i = 0; i < 64; ++i){
 				baseline += is.read();
 			}
-//			System.out.println("Baseline: " + (baseline /= 64));
+			System.out.println("Baseline: " + (baseline /= 64));
 			
 			get5BNRZI(is, bitStorage);
-/*			for (int j = 0; j < bitStorage.length; ++j){
-				System.out.println(j + ":" + Integer.toBinaryString(bitStorage[j] & 0x1F));
-			}*/
-			
-//			convert5B4B(bitStorage);
-			
-			
+			for (int i = 0; i < 512; ++i){
+				System.out.println(i + ": " + (bitStorage[i] & 0x1F));
+			}
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
 	}
-	
 	public static void get5BNRZI(InputStream is, byte[] bitStorage) throws IOException {
+		byte receiver = 0, hold = 0;
+		int arrSlot = 0;
+		
+		for (int i = 0; i < 64; ++i){ //320/5 = 64
+			receiver = (byte) is.read();
+			//1
+			bitStorage[arrSlot++] = (byte) (receiver >> 3);
+//			System.out.println(" 0: " + Integer.toBinaryString(bitStorage[0] & 0x1F));
+			receiver <<= 5;
+			receiver >>= 5; //clear stored left 5 bits, 3left
+			hold = receiver; // hold 3 bits
+			hold <<= 2;
+			
+			receiver = (byte) is.read();
+			hold = (byte) (hold | (receiver >> 6)); // give hold 2 bits
+			receiver <<= 2;
+			receiver >>= 2;	// 6 bits left
+			
+			//2
+			bitStorage[arrSlot++] = hold;
+//			System.out.println("1: " + Integer.toBinaryString(bitStorage[1] & 0x1F));
+			//3
+			bitStorage[arrSlot++] = (byte) (receiver >> 1);
+//			System.out.println("2: " + Integer.toBinaryString(bitStorage[2] & 0x1F));
+			receiver <<= 7;
+			receiver >>= 7; // 1 bit left
+			hold = receiver; // has 1 bit
+			hold <<= 4;
+			receiver = (byte) is.read();
+			hold = (byte) (hold | (receiver >> 4)); // give hold 1bit
+			//4
+			bitStorage[arrSlot++] = hold; 
+			receiver <<= 4;
+			receiver >>= 4;
+			
+			hold = receiver; //4 bit hold
+			receiver = (byte) is.read();
+			hold <<= 1;
+			hold = (byte) (hold | receiver >> 7); //give hold 1 bit
+			receiver <<= 1;
+			receiver >>= 1; // receiver has 7 bits
+			//5
+			bitStorage[arrSlot++] = hold;
+			//6
+			bitStorage[arrSlot++] = (byte) (receiver >> 2);
+			receiver <<= 6;
+			receiver >>= 6;
+			
+			hold = receiver; // has 2 bits
+			receiver = (byte) is.read();
+			hold <<= 3;
+			hold = (byte) (hold | (receiver >> 5));
+			//7 
+			bitStorage[arrSlot++] = hold;
+			receiver <<= 3;
+			receiver >>= 3;
+			//8
+			bitStorage[arrSlot++] = receiver;
+			
+		}
+	}
+/*	public static void get5BNRZI(InputStream is, byte[] bitStorage) throws IOException {
 		int digits = 0, arrSlot = 0;
 		short fiveBitStorage = 0;
 		byte received = 0;
@@ -64,11 +121,10 @@ public class PhysLayerClient {
 					fiveBitStorage <<= (15-digits);
 					System.out.println("out");
 				}
-	//			System.out.println("new fbs: " + Integer.toBinaryString(fiveBitStorage & 0x1F));
 				digits -= 5;
 			}
 		}
-	}
+	}*/
 	/**
 	 * convert 5B table to 4B
 	 * @param bitStorage
