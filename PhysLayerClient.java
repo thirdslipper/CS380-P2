@@ -25,9 +25,10 @@ public class PhysLayerClient {
 			System.out.println("Baseline: " + (baseline /= 64));
 			
 			get5BNRZI(is, bitStorage);
-			for (int i = 0; i < 512; ++i){
+/*			for (int i = 0; i < 512; ++i){
 				System.out.println(i + ": " + (bitStorage[i] & 0x1F));
-			}
+			}*/
+			decodeNRZI(bitStorage);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -95,42 +96,82 @@ public class PhysLayerClient {
 		}
 	}
 	public static void decodeNRZI(byte[] bitStorage){
-		Signal sign;
-		byte decoded = 0;
-		for (int i = 0; i < bitStorage.length; ++i){
+		Signal sign; 
+		byte decoded;
+		
+		for (int i = 0; i < 5; ++i){
 			sign = Signal.DOWN;
+			System.out.println("byte: " + Integer.toBinaryString(bitStorage[i] & 0x1F));
+			decoded = 0;
 			//iter 1
-			if ((bitStorage[i] >> 4) == 1){
+			if ((bitStorage[i] >> 4) == 1 && sign == Signal.DOWN){	//flip
 				sign = Signal.UP;
 				decoded |= 0x10;
 			}
-			else if((bitStorage[i] >> 4) == 0){
+			else if((bitStorage[i] >> 4) == 0 && sign == Signal.UP){ //flip
 				sign = Signal.DOWN;
-				decoded |= 0x0;
+				decoded |= 0x10;
 			}
+			bitStorage[i] &= 0xF; // rightmost 4 bits to decode
 			
-			bitStorage[i] &= 0x0F;
 			//iter 2
-			if ((bitStorage[i] >> 3) == 1 && sign == Signal.UP){	// not needed?, add 0 to 4th
-		//		decoded |= 0x10;	
-			}
-			else if ((bitStorage[i] >> 3) == 0 && sign == Signal.UP){	// add 1 to 4th, signal flip
+			if(((bitStorage[i] >> 3) == 0 && sign == Signal.UP)
+				|| ((bitStorage[i] >> 3) == 1 && sign == Signal.DOWN)){
 				decoded |= 0x8;
-				sign = Signal.DOWN;
+				if (sign == Signal.DOWN){
+					sign = Signal.UP;
+				}
+				else{
+					sign = Signal.DOWN;
+				}
 			}
-			else if ((bitStorage[i] >> 3) == 1 && sign == Signal.DOWN){ // add 1 to 4th, signal flip
-				decoded |= 0x8;
-				sign = Signal.UP;
+			bitStorage[i] &= 0x07;
+			
+			//iter 3
+			if(((bitStorage[i] >> 2) == 0 && sign == Signal.UP)
+				|| ((bitStorage[i] >> 2) == 1 && sign == Signal.DOWN)){
+				decoded |= 0x4;
+				if (sign == Signal.DOWN){
+					sign = Signal.UP;
+				}
+				else{
+					sign = Signal.DOWN;
+				}
 			}
-			else if ((bitStorage[i] >> 3) == 0 && sign == Signal.DOWN){ // add 0 to 4th, stays down
-		//		decoded |= 0x10;	
+			bitStorage[i] &= 0x03;
+			
+			//iter 4
+			if(((bitStorage[i] >> 1) == 0 && sign == Signal.UP)
+				|| ((bitStorage[i] >> 1) == 1 && sign == Signal.DOWN)){
+				decoded |= 0x2;
+				if (sign == Signal.DOWN){
+					sign = Signal.UP;
+				}
+				else{
+					sign = Signal.DOWN;
+				}
 			}
+			bitStorage[i] &= 0x01;
+			
+			//iter 5
+			if(((bitStorage[i]) == 0 && sign == Signal.UP)
+				|| ((bitStorage[i]) == 1 && sign == Signal.DOWN)){
+				decoded |= 0x1;
+				if (sign == Signal.DOWN){
+					sign = Signal.UP;
+				}
+				else{
+					sign = Signal.DOWN;
+				}
+			}
+			bitStorage[i] = decoded;
+			System.out.println((Integer.toBinaryString(bitStorage[i] & 0x1F)));
+			
+			
+
 		}
 	}
-	public static int checkNRZI(byte bit, byte[] bitStorage, Signal sign){
-		
-		return 0;
-	}
+
 /*	public static void get5BNRZI(InputStream is, byte[] bitStorage) throws IOException {
 		int digits = 0, arrSlot = 0;
 		short fiveBitStorage = 0;
