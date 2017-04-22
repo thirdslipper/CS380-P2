@@ -16,13 +16,13 @@ public class PhysLayerClient {
 			System.out.println("Connected to: " + socket.getInetAddress() + ":" + socket.getPort() + "\n");
 			OutputStream os = socket.getOutputStream();
 			InputStream is = socket.getInputStream();
-			
+
 			double baseline = 0;
 			for (int i = 0; i < 64; ++i){
 				baseline += is.read();
 			}
 			System.out.println("Baseline: " + (baseline /= 64));
-			
+
 			get5BNRZI(is, bitStorage, baseline);
 			System.out.println("first 20");
 			for (int i = 0; i < 20; ++i){
@@ -31,9 +31,9 @@ public class PhysLayerClient {
 			System.out.println();
 			newBitStorage = decodeNRZI(bitStorage);
 			convert5B4B(newBitStorage);
-//			os.write(halfArray(newBitStorage));
-//			System.out.println(is.read());
-			
+			//			os.write(halfArray(newBitStorage));
+			//			System.out.println(is.read());
+
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -43,7 +43,7 @@ public class PhysLayerClient {
 		int arrSlot = 0;
 		for (int i = 0; i < 20; ++i){ //320
 			receiver = (byte) is.read();
-//			System.out.println("receiver: " + (receiver) + ", baseline: " + ((int) baseline));
+			//			System.out.println("receiver: " + (receiver) + ", baseline: " + ((int) baseline));
 			if ((receiver & 0xFF) > baseline){
 				bitStorage[arrSlot++] = (byte) 0x1;
 			}else{
@@ -59,77 +59,75 @@ public class PhysLayerClient {
 		}
 		return halfArray;
 	}
-	
+
 
 	public static byte[] decodeNRZI(byte[] bitStorage){
 		Signal sign = Signal.DOWN;
 		byte[] result = new byte[64];
 		byte decoded;
-		
-		for (int i = 0; i < 4; ++i){ 	//64
+
+		for (int i = 0; i < 4; ++i){ 			//64
 			decoded = 0;
-			
-			for (int j = 0; j < 5; ++j){
-				System.out.print("\n" + bitStorage[j*i] + " " + bitStorage[j*i + 1] + " " + bitStorage[j*i + 2] + " " + bitStorage[j*i + 3] + " " + bitStorage[j*i + 4]);
-				//iter 1
-				if ((bitStorage[j*i] & 0x1)  == 1 && sign == Signal.DOWN){
+
+//				System.out.print("\n" + bitStorage[5*i] + " " + bitStorage[5*i + 1] + " " + bitStorage[5*i + 2] + " " + bitStorage[5*i + 3] + " " + bitStorage[5*i + 4]);
+			//iter 1
+			if ((bitStorage[5*i] & 0x1)  == 1 && sign == Signal.DOWN){
+				sign = Signal.UP;
+				decoded |= 0x10;
+			}
+			else if((bitStorage[5*i] & 0x1) == 0 && sign == Signal.UP){ //flip
+				sign = Signal.DOWN;
+				decoded |= 0x10;
+			}
+			//iter 2
+			if(((bitStorage[(5*i) + 1] & 0x1) == 0 && sign == Signal.UP)
+					|| ((bitStorage[(5*i) + 1] & 0x1) == 1 && sign == Signal.DOWN)){
+				decoded |= 0x8;
+				if (sign == Signal.DOWN){
 					sign = Signal.UP;
-					decoded |= 0x10;
 				}
-				else if((bitStorage[j*i] & 0x1) == 0 && sign == Signal.UP){ //flip
+				else{
 					sign = Signal.DOWN;
-					decoded |= 0x10;
 				}
-				//iter 2
-				if(((bitStorage[(j*i) + 1] & 0x1) == 0 && sign == Signal.UP)
-						|| ((bitStorage[(j*i) + 1] & 0x1) == 1 && sign == Signal.DOWN)){
-					decoded |= 0x8;
-					if (sign == Signal.DOWN){
-						sign = Signal.UP;
-					}
-					else{
-						sign = Signal.DOWN;
-					}
-				}
+			}
 
-				//iter 3
-				if(((bitStorage[(j*i) +2] & 0x1) == 0 && sign == Signal.UP)
-						|| ((bitStorage[(j*i) +2] & 0x1) == 1 && sign == Signal.DOWN)){
-					decoded |= 0x4;
-					if (sign == Signal.DOWN){
-						sign = Signal.UP;
-					}
-					else{
-						sign = Signal.DOWN;
-					}
+			//iter 3
+			if(((bitStorage[(5*i) +2] & 0x1) == 0 && sign == Signal.UP)
+					|| ((bitStorage[(5*i) +2] & 0x1) == 1 && sign == Signal.DOWN)){
+				decoded |= 0x4;
+				if (sign == Signal.DOWN){
+					sign = Signal.UP;
 				}
-
-				//iter 4
-				if(((bitStorage[i*j +3] & 0x1) == 0 && sign == Signal.UP)
-						|| ((bitStorage[(j*i) +3] & 0x1) == 1 && sign == Signal.DOWN)){
-					decoded |= 0x2;
-					if (sign == Signal.DOWN){
-						sign = Signal.UP;
-					}
-					else{
-						sign = Signal.DOWN;
-					}
+				else{
+					sign = Signal.DOWN;
 				}
+			}
 
-				//iter 5
-				if(((bitStorage[i*j+4] & 0x1) == 0 && (sign == Signal.UP))
-						|| ((bitStorage[(j*i) +4] & 0x1) == 1 && sign == Signal.DOWN)){
-					decoded |= 0x1;
-					if (sign == Signal.DOWN){
-						sign = Signal.UP;
-					}
-					else{
-						sign = Signal.DOWN;
-					}
+			//iter 4
+			if(((bitStorage[i*5 +3] & 0x1) == 0 && sign == Signal.UP)
+					|| ((bitStorage[(5*i) +3] & 0x1) == 1 && sign == Signal.DOWN)){
+				decoded |= 0x2;
+				if (sign == Signal.DOWN){
+					sign = Signal.UP;
+				}
+				else{
+					sign = Signal.DOWN;
+				}
+			}
+
+			//iter 5
+			if(((bitStorage[i*5+4] & 0x1) == 0 && (sign == Signal.UP))
+					|| ((bitStorage[(5*i) +4] & 0x1) == 1 && sign == Signal.DOWN)){
+				decoded |= 0x1;
+				if (sign == Signal.DOWN){
+					sign = Signal.UP;
+				}
+				else{
+					sign = Signal.DOWN;
 				}
 			}
 			result[i] = decoded;
-			System.out.println("\nresult: " + result[i]);
+//				System.out.println("\nresult: " + Integer.toBinaryString(result[i] & 0x1F));
 		}
 		return result;
 	}
