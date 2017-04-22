@@ -9,92 +9,227 @@ public class PhysLayerClient {
 	public enum Signal {UP, DOWN}
 
 	public static void main(String args[]) throws IOException{
-		byte[] bitStorage = new byte[512];
+		byte[] bitStorage = new byte[320];
+		byte[] newBitStorage;
 
 		try (Socket socket = new Socket("codebank.xyz", 38002)){
 			System.out.println("Connected to: " + socket.getInetAddress() + ":" + socket.getPort() + "\n");
 			OutputStream os = socket.getOutputStream();
 			InputStream is = socket.getInputStream();
+			
 			double baseline = 0;
 			for (int i = 0; i < 64; ++i){
 				baseline += is.read();
 			}
 			System.out.println("Baseline: " + (baseline /= 64));
-
+			
 			get5BNRZI(is, bitStorage, baseline);
-			decodeNRZI(bitStorage);
+			System.out.println("first 20");
+			for (int i = 0; i < 20; ++i){
+				System.out.print(bitStorage[i]);
+			}
+			System.out.println();
+			newBitStorage = decodeNRZI(bitStorage);
+			convert5B4B(newBitStorage);
+//			os.write(halfArray(newBitStorage));
+//			System.out.println(is.read());
+			
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
 	}
 	public static void get5BNRZI(InputStream is, byte[] bitStorage, double baseline) throws IOException {
-		byte receiver = 0, hold = 0;
+		byte receiver = 0;
 		int arrSlot = 0;
-
-		for (int i = 0; i < 1; ++i){ //320/5 = 64
-			receiver = (byte) is.read();	//get 8 bits
-			System.out.println("orig msg: " + (Integer.toBinaryString(receiver & 0xFF)));
-			//1
-			bitStorage[arrSlot++] = (byte) (receiver >> 3);	//inc arrSlot, store left 5 values into bitStorage
-			//				System.out.println("storing:  " + Integer.toBinaryString(bitStorage[i*8] & 0x1F));
-			receiver &= 0x7; 		//keep 3 right values
-			//System.out.println("r after: " + (Integer.toBinaryString(receiver & 0xFF)));		
-			hold = receiver; 		// hold leftover 3 bits
-			hold <<= 2;				// Make room for remaining 2 bits on right
-
+		for (int i = 0; i < 20; ++i){ //320
 			receiver = (byte) is.read();
-			//				System.out.println("orig msg: " + (Integer.toBinaryString(receiver & 0xFF)));
-			hold = (byte) (hold | (receiver >> 6 & 0x3)); // give hold 2 bits
-			receiver &= 0x7F; //(127) keep 6 right values
-			//2
-			bitStorage[arrSlot++] = hold;
-			//				System.out.println("storing:  " + Integer.toBinaryString(bitStorage[i*8+1] & 0x1F));
-			//3
-			bitStorage[arrSlot++] = (byte) (receiver >> 1 & 0x1F); 	//0001 1111
-			//				System.out.println("storing:  " + Integer.toBinaryString(bitStorage[i*8+2] & 0x1F));
-			receiver &= 0x1;// 1 bit left
-
-			hold = receiver; // has 1 bit
-			hold <<= 4;
-			receiver = (byte) is.read();
-			//				System.out.println("orig msg: " + (Integer.toBinaryString(receiver & 0xFF)));
-			hold = (byte) (hold | (receiver >> 4 & 0xF)); // give hold 4 bits
-
-			//4
-			bitStorage[arrSlot++] = hold;
-			//				System.out.println("storing:  " + Integer.toBinaryString(bitStorage[i*8+3] & 0x1F));
-			receiver &= 0xF; 
-
-			hold = receiver; //4 bit hold
-			receiver = (byte) is.read();
-			//				System.out.println("orig msg: " + (Integer.toBinaryString(receiver & 0xFF)));
-			hold <<= 1;
-			hold = (byte) (hold | receiver >> 7 & 0x1); //give hold 1 bit
-			receiver &= 0x7F;// receiver has 7 bits
-			//5
-			bitStorage[arrSlot++] = hold;
-			//				System.out.println("storing:  " + Integer.toBinaryString(bitStorage[i*8+4] & 0x1F));
-			//6
-			bitStorage[arrSlot++] = (byte) (receiver >> 2 & 0x1F);
-			//				System.out.println("storing:  " + Integer.toBinaryString(bitStorage[i*8+5] & 0x1F));
-			receiver &= 0x3; //keep 2 bits 
-
-			hold = receiver; // has 2 bits
-			hold <<= 3;
-			receiver = (byte) is.read();
-			//				System.out.println("orig msg: " + (Integer.toBinaryString(receiver & 0xFF)));
-			hold = (byte) (hold | (receiver >> 5 & 0x7));
-			//7 
-			bitStorage[arrSlot++] = hold;
-			//				System.out.println("storing:  " + Integer.toBinaryString(bitStorage[i*8+6] & 0x1F));
-			receiver &= 0x1F;
-			//8
-			bitStorage[arrSlot++] = receiver;
-			//				System.out.println("storing:  " + Integer.toBinaryString(bitStorage[i*8+7] & 0x1F));
-
+//			System.out.println("receiver: " + (receiver) + ", baseline: " + ((int) baseline));
+			if ((receiver & 0xFF) > baseline){
+				bitStorage[arrSlot++] = (byte) 0x1;
+			}else{
+				bitStorage[arrSlot++] = (byte) 0x0;
+			}
 		}
 	}
-	public static void decodeNRZI(byte[] bitStorage){
+	public static byte[] halfArray(byte[] bitStorage){
+		byte[] halfArray = new byte[bitStorage.length/2];
+		for (int i = 0; i < halfArray.length; ++i){
+			bitStorage[i] <<= 4;
+			halfArray[i] = (byte) (bitStorage[i] | bitStorage[i+1]);
+		}
+		return halfArray;
+	}
+	
+
+	public static byte[] decodeNRZI(byte[] bitStorage){
+		Signal sign = Signal.DOWN;
+		byte[] result = new byte[64];
+		byte decoded;
+		
+		for (int i = 0; i < 4; ++i){ 	//64
+			decoded = 0;
+			
+			for (int j = 0; j < 5; ++j){
+				System.out.print("\n" + bitStorage[j*i] + " " + bitStorage[j*i + 1] + " " + bitStorage[j*i + 2] + " " + bitStorage[j*i + 3] + " " + bitStorage[j*i + 4]);
+				//iter 1
+				if ((bitStorage[j*i] & 0x1)  == 1 && sign == Signal.DOWN){
+					sign = Signal.UP;
+					decoded |= 0x10;
+				}
+				else if((bitStorage[j*i] & 0x1) == 0 && sign == Signal.UP){ //flip
+					sign = Signal.DOWN;
+					decoded |= 0x10;
+				}
+				//iter 2
+				if(((bitStorage[(j*i) + 1] & 0x1) == 0 && sign == Signal.UP)
+						|| ((bitStorage[(j*i) + 1] & 0x1) == 1 && sign == Signal.DOWN)){
+					decoded |= 0x8;
+					if (sign == Signal.DOWN){
+						sign = Signal.UP;
+					}
+					else{
+						sign = Signal.DOWN;
+					}
+				}
+
+				//iter 3
+				if(((bitStorage[(j*i) +2] & 0x1) == 0 && sign == Signal.UP)
+						|| ((bitStorage[(j*i) +2] & 0x1) == 1 && sign == Signal.DOWN)){
+					decoded |= 0x4;
+					if (sign == Signal.DOWN){
+						sign = Signal.UP;
+					}
+					else{
+						sign = Signal.DOWN;
+					}
+				}
+
+				//iter 4
+				if(((bitStorage[i*j +3] & 0x1) == 0 && sign == Signal.UP)
+						|| ((bitStorage[(j*i) +3] & 0x1) == 1 && sign == Signal.DOWN)){
+					decoded |= 0x2;
+					if (sign == Signal.DOWN){
+						sign = Signal.UP;
+					}
+					else{
+						sign = Signal.DOWN;
+					}
+				}
+
+				//iter 5
+				if(((bitStorage[i*j+4] & 0x1) == 0 && (sign == Signal.UP))
+						|| ((bitStorage[(j*i) +4] & 0x1) == 1 && sign == Signal.DOWN)){
+					decoded |= 0x1;
+					if (sign == Signal.DOWN){
+						sign = Signal.UP;
+					}
+					else{
+						sign = Signal.DOWN;
+					}
+				}
+			}
+			result[i] = decoded;
+			System.out.println("\nresult: " + result[i]);
+		}
+		return result;
+	}
+	public static void convert5B4B(byte[] bitStorage){
+		/*		byte fiveBitTable[] = {30, 9, 20, 21, 10, 11, 14, 15,
+				18, 19, 22, 23, 26, 27, 28, 29};*/
+		HashMap<Integer, Integer> fourBitToFiveBit = new HashMap<Integer ,Integer>(){{
+			put(30, 0);
+			put(9, 1);
+			put(20, 2);
+			put(21, 3);
+			put(10, 4);
+			put(11, 5);
+			put(14, 6);
+			put(15, 7);
+			put(18, 8);
+			put(19, 9);
+			put(22, 10);
+			put(23, 11);
+			put(26, 12);
+			put(27, 13);
+			put(28, 14);
+			put(29, 15);
+		}};
+		int temp;
+		for (int i = 0; i < bitStorage.length; ++i){
+			temp = fourBitToFiveBit.get(bitStorage[i]);
+			bitStorage[i] = (byte) (temp & 0xF);
+		}
+	}
+}
+
+/*	public static void get5BNRZI(InputStream is, byte[] bitStorage, double baseline) throws IOException {
+byte receiver = 0, hold = 0;
+int arrSlot = 0;
+
+for (int i = 0; i < 1; ++i){ //320/5 = 64
+	receiver = (byte) is.read();	//get 8 bits
+	System.out.println("orig msg: " + (Integer.toBinaryString(receiver & 0xFF)));
+	//1
+	bitStorage[arrSlot++] = (byte) (receiver >> 3);	//inc arrSlot, store left 5 values into bitStorage
+	//				System.out.println("storing:  " + Integer.toBinaryString(bitStorage[i*8] & 0x1F));
+	receiver &= 0x7; 		//keep 3 right values
+	//System.out.println("r after: " + (Integer.toBinaryString(receiver & 0xFF)));		
+	hold = receiver; 		// hold leftover 3 bits
+	hold <<= 2;				// Make room for remaining 2 bits on right
+
+	receiver = (byte) is.read();
+	//				System.out.println("orig msg: " + (Integer.toBinaryString(receiver & 0xFF)));
+	hold = (byte) (hold | (receiver >> 6 & 0x3)); // give hold 2 bits
+	receiver &= 0x7F; //(127) keep 6 right values
+	//2
+	bitStorage[arrSlot++] = hold;
+	//				System.out.println("storing:  " + Integer.toBinaryString(bitStorage[i*8+1] & 0x1F));
+	//3
+	bitStorage[arrSlot++] = (byte) (receiver >> 1 & 0x1F); 	//0001 1111
+	//				System.out.println("storing:  " + Integer.toBinaryString(bitStorage[i*8+2] & 0x1F));
+	receiver &= 0x1;// 1 bit left
+
+	hold = receiver; // has 1 bit
+	hold <<= 4;
+	receiver = (byte) is.read();
+	//				System.out.println("orig msg: " + (Integer.toBinaryString(receiver & 0xFF)));
+	hold = (byte) (hold | (receiver >> 4 & 0xF)); // give hold 4 bits
+
+	//4
+	bitStorage[arrSlot++] = hold;
+	//				System.out.println("storing:  " + Integer.toBinaryString(bitStorage[i*8+3] & 0x1F));
+	receiver &= 0xF; 
+
+	hold = receiver; //4 bit hold
+	receiver = (byte) is.read();
+	//				System.out.println("orig msg: " + (Integer.toBinaryString(receiver & 0xFF)));
+	hold <<= 1;
+	hold = (byte) (hold | receiver >> 7 & 0x1); //give hold 1 bit
+	receiver &= 0x7F;// receiver has 7 bits
+	//5
+	bitStorage[arrSlot++] = hold;
+	//				System.out.println("storing:  " + Integer.toBinaryString(bitStorage[i*8+4] & 0x1F));
+	//6
+	bitStorage[arrSlot++] = (byte) (receiver >> 2 & 0x1F);
+	//				System.out.println("storing:  " + Integer.toBinaryString(bitStorage[i*8+5] & 0x1F));
+	receiver &= 0x3; //keep 2 bits 
+
+	hold = receiver; // has 2 bits
+	hold <<= 3;
+	receiver = (byte) is.read();
+	//				System.out.println("orig msg: " + (Integer.toBinaryString(receiver & 0xFF)));
+	hold = (byte) (hold | (receiver >> 5 & 0x7));
+	//7 
+	bitStorage[arrSlot++] = hold;
+	//				System.out.println("storing:  " + Integer.toBinaryString(bitStorage[i*8+6] & 0x1F));
+	receiver &= 0x1F;
+	//8
+	bitStorage[arrSlot++] = receiver;
+	//				System.out.println("storing:  " + Integer.toBinaryString(bitStorage[i*8+7] & 0x1F));
+
+}
+}*/
+/*	public static void decodeNRZI(byte[] bitStorage){
 		Signal sign; //= Signal.DOWN; // represent prev bit 
 		byte decoded;
 
@@ -166,40 +301,8 @@ public class PhysLayerClient {
 			}
 			bitStorage[i] = decoded;
 			System.out.println("NRZI decoded:  " + (Integer.toBinaryString(bitStorage[i] & 0x1F)));
-
-
-
 		}
-	}
-	public static void convert5B4B(byte[] bitStorage){
-		/*		byte fiveBitTable[] = {30, 9, 20, 21, 10, 11, 14, 15,
-				18, 19, 22, 23, 26, 27, 28, 29};*/
-		HashMap<Integer, Integer> fourBitToFiveBit = new HashMap<Integer ,Integer>(){{
-			put(30, 0);
-			put(9, 1);
-			put(20, 2);
-			put(21, 3);
-			put(10, 4);
-			put(11, 5);
-			put(14, 6);
-			put(15, 7);
-			put(18, 8);
-			put(19, 9);
-			put(22, 10);
-			put(23, 11);
-			put(26, 12);
-			put(27, 13);
-			put(28, 14);
-			put(29, 15);
-		}};
-		int hold;
-		for (int i = 0; i < bitStorage.length; ++i){
-			hold = fourBitToFiveBit.get(bitStorage[i]);
-			bitStorage[i] = (byte) hold;
-		}
-	}
-
-}
+	}*/
 
 /*	public static void get5BNRZI(InputStream is, byte[] bitStorage) throws IOException {
 		int digits = 0, arrSlot = 0;
