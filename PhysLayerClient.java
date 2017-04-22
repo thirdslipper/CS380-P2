@@ -24,15 +24,15 @@ public class PhysLayerClient {
 			System.out.println("Baseline: " + (baseline /= 64));
 
 			get5BNRZI(is, bitStorage, baseline);
-			System.out.println("first 20");
-			for (int i = 0; i < 20; ++i){
-				System.out.print(bitStorage[i]);
-			}
-			System.out.println();
+/*		System.out.println("first 20");
+		for (int i = 0; i < 20; ++i){
+			System.out.print(bitStorage[i]);
+		}
+		System.out.println();*/
 			newBitStorage = decodeNRZI(bitStorage);
 			convert5B4B(newBitStorage);
-			//			os.write(halfArray(newBitStorage));
-			//			System.out.println(is.read());
+		//			os.write(halfArray(newBitStorage));
+		//			System.out.println(is.read());
 
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -41,7 +41,7 @@ public class PhysLayerClient {
 	public static void get5BNRZI(InputStream is, byte[] bitStorage, double baseline) throws IOException {
 		byte receiver = 0;
 		int arrSlot = 0;
-		for (int i = 0; i < 20; ++i){ //320
+		for (int i = 0; i < 320; ++i){ //320
 			receiver = (byte) is.read();
 			//			System.out.println("receiver: " + (receiver) + ", baseline: " + ((int) baseline));
 			if ((receiver & 0xFF) > baseline){
@@ -60,13 +60,13 @@ public class PhysLayerClient {
 		return halfArray;
 	}
 
-
+	//return 64bytes of 5bits
 	public static byte[] decodeNRZI(byte[] bitStorage){
 		Signal sign = Signal.DOWN;
 		byte[] result = new byte[64];
 		byte decoded;
 
-		for (int i = 0; i < 4; ++i){ 			//64
+		for (int i = 0; i < 64; ++i){ 			//64
 			decoded = 0;
 
 //				System.out.print("\n" + bitStorage[5*i] + " " + bitStorage[5*i + 1] + " " + bitStorage[5*i + 2] + " " + bitStorage[5*i + 3] + " " + bitStorage[5*i + 4]);
@@ -127,14 +127,15 @@ public class PhysLayerClient {
 				}
 			}
 			result[i] = decoded;
-//				System.out.println("\nresult: " + Integer.toBinaryString(result[i] & 0x1F));
+			//System.out.println("\nresult: " + Integer.toBinaryString(result[i] & 0x1F));
+//			System.out.println("\nresult: " + (result[i] & 0x1F));
 		}
 		return result;
 	}
 	public static void convert5B4B(byte[] bitStorage){
 		/*		byte fiveBitTable[] = {30, 9, 20, 21, 10, 11, 14, 15,
 				18, 19, 22, 23, 26, 27, 28, 29};*/
-		HashMap<Integer, Integer> fourBitToFiveBit = new HashMap<Integer ,Integer>(){{
+		HashMap<Integer, Integer> fiveBitToFourBit = new HashMap<Integer ,Integer>(){{
 			put(30, 0);
 			put(9, 1);
 			put(20, 2);
@@ -154,8 +155,9 @@ public class PhysLayerClient {
 		}};
 		int temp;
 		for (int i = 0; i < bitStorage.length; ++i){
-			temp = fourBitToFiveBit.get(bitStorage[i]);
+			temp = fiveBitToFourBit.get(bitStorage[i] & 0x1F);
 			bitStorage[i] = (byte) (temp & 0xF);
+			System.out.println(bitStorage[i] & 0xF);
 		}
 	}
 }
