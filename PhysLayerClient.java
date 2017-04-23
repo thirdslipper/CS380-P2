@@ -8,9 +8,9 @@ import java.util.HashMap;
 public class PhysLayerClient {
 	public enum Signal {UP, DOWN}
 
-	public static void main(String args[]) throws IOException{
+	public static void main(String args[]) throws UnknownHostException, IOException{
 		byte[] bitStorage = new byte[320];
-		byte[] newBitStorage;
+		byte[] convertedBits;
 		byte[] origMsg;
 
 		try (Socket socket = new Socket("codebank.xyz", 38002)){
@@ -25,14 +25,22 @@ public class PhysLayerClient {
 			System.out.println("Baseline: " + (baseline /= 64));
 
 			get5BNRZI(is, bitStorage, baseline);
-			System.out.println();
-			newBitStorage = decodeNRZI(bitStorage);
+			convertedBits = decodeNRZI(bitStorage);
 			
-			convert5B4B(newBitStorage);
-			origMsg = halfArray(newBitStorage);	
+			convert5B4B(convertedBits);
+			origMsg = halfArray(convertedBits);	
 			os.write(origMsg);
+			System.out.print("Received 32 bytes: ");
+			for (int j = 0; j < origMsg.length; ++j){
+				System.out.print(Integer.toHexString(origMsg[j] & 0xFF));
+			}
 			
-			System.out.println(is.read());
+			if (is.read() == 1){
+				System.out.println("\nResponse good.");
+			}
+			else{
+				System.out.println("\nResponse bad.");
+			}
 
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -40,7 +48,7 @@ public class PhysLayerClient {
 	}
 	public static void get5BNRZI(InputStream is, byte[] bitStorage, double baseline) throws IOException {
 		byte receiver = 0;
-		System.out.println("start: ");
+//		System.out.println("start: ");
 
 		for (int i = 0; i < 320; ++i){ 			//320
 			receiver = (byte) is.read();
@@ -49,8 +57,8 @@ public class PhysLayerClient {
 			}else if ((receiver & 0xFF) < baseline){
 				bitStorage[i] = (byte) 0x00;
 			}
-			//			System.out.println("receiver: " + (receiver & 0xFF) + ", baseline: " + (int) baseline + " result: " + bitStorage[i]);
-			System.out.print(bitStorage[i] & 0x1);
+//			System.out.println("receiver: " + (receiver & 0xFF) + ", baseline: " + (int) baseline + " result: " + bitStorage[i]);
+//			System.out.print(bitStorage[i] & 0x1);
 		}
 	}
 
@@ -60,10 +68,10 @@ public class PhysLayerClient {
 		byte[] result = new byte[64];
 		byte decoded = 0x00;
 
-		System.out.println("result: ");
+//		System.out.println("result: ");
 		for (int i = 0; i < 64; ++i){ 			//64
 			decoded &= 0x00;
-			//				System.out.print("\n" + bitStorage[5*i] + " " + bitStorage[5*i + 1] + " " + bitStorage[5*i + 2] + " " + bitStorage[5*i + 3] + " " + bitStorage[5*i + 4]);
+			//System.out.print("\n" + bitStorage[5*i] + " " + bitStorage[5*i + 1] + " " + bitStorage[5*i + 2] + " " + bitStorage[5*i + 3] + " " + bitStorage[5*i + 4]);
 			
 			// if prev signal is down and new signal is up, flip.
 			//iter 1
@@ -180,7 +188,7 @@ public class PhysLayerClient {
 		for (int i = 0; i < bitStorage.length; ++i){
 			temp = fiveBitToFourBit.get(bitStorage[i] & 0x1F);
 			bitStorage[i] = (byte) (temp & 0xF);
-			//			System.out.println(bitStorage[i] & 0xF);
+//			System.out.println(bitStorage[i] & 0xF);
 		}
 	}
 }
