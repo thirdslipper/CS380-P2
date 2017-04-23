@@ -11,6 +11,7 @@ public class PhysLayerClient {
 	public static void main(String args[]) throws IOException{
 		byte[] bitStorage = new byte[320];
 		byte[] newBitStorage;
+		byte[] origMsg;
 
 		try (Socket socket = new Socket("codebank.xyz", 38002)){
 			System.out.println("Connected to: " + socket.getInetAddress() + ":" + socket.getPort() + "\n");
@@ -24,15 +25,14 @@ public class PhysLayerClient {
 			System.out.println("Baseline: " + (baseline /= 64));
 
 			get5BNRZI(is, bitStorage, baseline);
-/*		System.out.println("first 20");
-		for (int i = 0; i < 20; ++i){
-			System.out.print(bitStorage[i]);
-		}
-		System.out.println();*/
+			System.out.println();
 			newBitStorage = decodeNRZI(bitStorage);
+			
 			convert5B4B(newBitStorage);
-		//			os.write(halfArray(newBitStorage));
-		//			System.out.println(is.read());
+			origMsg = halfArray(newBitStorage);	
+			os.write(origMsg);
+			
+			System.out.println(is.read());
 
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -40,97 +40,120 @@ public class PhysLayerClient {
 	}
 	public static void get5BNRZI(InputStream is, byte[] bitStorage, double baseline) throws IOException {
 		byte receiver = 0;
-		int arrSlot = 0;
-		for (int i = 0; i < 320; ++i){ //320
+		System.out.println("start: ");
+
+		for (int i = 0; i < 320; ++i){ 			//320
 			receiver = (byte) is.read();
-			//			System.out.println("receiver: " + (receiver) + ", baseline: " + ((int) baseline));
 			if ((receiver & 0xFF) > baseline){
-				bitStorage[arrSlot++] = (byte) 0x1;
-			}else{
-				bitStorage[arrSlot++] = (byte) 0x0;
+				bitStorage[i] = (byte) 0x01;
+			}else if ((receiver & 0xFF) < baseline){
+				bitStorage[i] = (byte) 0x00;
 			}
+			//			System.out.println("receiver: " + (receiver & 0xFF) + ", baseline: " + (int) baseline + " result: " + bitStorage[i]);
+			System.out.print(bitStorage[i] & 0x1);
 		}
-	}
-	public static byte[] halfArray(byte[] bitStorage){
-		byte[] halfArray = new byte[bitStorage.length/2];
-		for (int i = 0; i < halfArray.length; ++i){
-			bitStorage[i] <<= 4;
-			halfArray[i] = (byte) (bitStorage[i] | bitStorage[i+1]);
-		}
-		return halfArray;
 	}
 
 	//return 64bytes of 5bits
 	public static byte[] decodeNRZI(byte[] bitStorage){
 		Signal sign = Signal.DOWN;
 		byte[] result = new byte[64];
-		byte decoded;
+		byte decoded = 0x00;
 
+		System.out.println("result: ");
 		for (int i = 0; i < 64; ++i){ 			//64
-			decoded = 0;
-
-//				System.out.print("\n" + bitStorage[5*i] + " " + bitStorage[5*i + 1] + " " + bitStorage[5*i + 2] + " " + bitStorage[5*i + 3] + " " + bitStorage[5*i + 4]);
+			decoded &= 0x00;
+			//				System.out.print("\n" + bitStorage[5*i] + " " + bitStorage[5*i + 1] + " " + bitStorage[5*i + 2] + " " + bitStorage[5*i + 3] + " " + bitStorage[5*i + 4]);
+			
+			// if prev signal is down and new signal is up, flip.
 			//iter 1
-			if ((bitStorage[5*i] & 0x1)  == 1 && sign == Signal.DOWN){
-				sign = Signal.UP;
+			if (((bitStorage[5*i] & 0x01)  == 1 && sign == Signal.DOWN) 	
+				|| ((bitStorage[5*i] & 0x01) == 0 && sign == Signal.UP)){
 				decoded |= 0x10;
-			}
-			else if((bitStorage[5*i] & 0x1) == 0 && sign == Signal.UP){ //flip
-				sign = Signal.DOWN;
-				decoded |= 0x10;
-			}
-			//iter 2
-			if(((bitStorage[(5*i) + 1] & 0x1) == 0 && sign == Signal.UP)
-					|| ((bitStorage[(5*i) + 1] & 0x1) == 1 && sign == Signal.DOWN)){
-				decoded |= 0x8;
+//				System.out.print(i + ": " + sign);
 				if (sign == Signal.DOWN){
 					sign = Signal.UP;
 				}
 				else{
 					sign = Signal.DOWN;
 				}
+//				System.out.println(" " + Integer.toBinaryString(decoded & 0x1F) + "signal: " + sign);
+			}
+
+			//iter 2
+			if(((bitStorage[(5*i) + 1] & 0x01) == 0 && sign == Signal.UP)
+					|| ((bitStorage[(5*i) + 1] & 0x01) == 1 && sign == Signal.DOWN)){
+				decoded |= 0x08;
+//				System.out.print(i + ": " + sign);
+				if (sign == Signal.DOWN){
+					sign = Signal.UP;
+				}
+				else{
+					sign = Signal.DOWN;
+				}
+//				System.out.println(i + ": " + Integer.toBinaryString(decoded & 0x1F) + "signal: " + sign);
 			}
 
 			//iter 3
-			if(((bitStorage[(5*i) +2] & 0x1) == 0 && sign == Signal.UP)
-					|| ((bitStorage[(5*i) +2] & 0x1) == 1 && sign == Signal.DOWN)){
-				decoded |= 0x4;
+			if(((bitStorage[(5*i) +2] & 0x01) == 0x00 && sign == Signal.UP)
+					|| ((bitStorage[(5*i) +2] & 0x01) == 1 && sign == Signal.DOWN)){
+				decoded |= 0x04;
+//				System.out.print(i + ": " + sign);
 				if (sign == Signal.DOWN){
 					sign = Signal.UP;
 				}
 				else{
 					sign = Signal.DOWN;
 				}
+//				System.out.println(i + ": " + Integer.toBinaryString(decoded & 0x1F) + "signal: " + sign);
 			}
 
 			//iter 4
-			if(((bitStorage[i*5 +3] & 0x1) == 0 && sign == Signal.UP)
-					|| ((bitStorage[(5*i) +3] & 0x1) == 1 && sign == Signal.DOWN)){
-				decoded |= 0x2;
+			if(((bitStorage[(5*i) +3] & 0x01) == 0x00 && sign == Signal.UP)
+					|| ((bitStorage[(5*i) +3] & 0x01) == 1 && sign == Signal.DOWN)){
+				decoded |= 0x02;
+//				System.out.print(i + ": " + sign);
 				if (sign == Signal.DOWN){
 					sign = Signal.UP;
 				}
 				else{
 					sign = Signal.DOWN;
 				}
+//				System.out.println(i + ": " + Integer.toBinaryString(decoded & 0x1F) + "signal: " + sign);
 			}
 
 			//iter 5
-			if(((bitStorage[i*5+4] & 0x1) == 0 && (sign == Signal.UP))
-					|| ((bitStorage[(5*i) +4] & 0x1) == 1 && sign == Signal.DOWN)){
-				decoded |= 0x1;
+			if(((bitStorage[(5*i)+4] & 0x01) == 0x00 && (sign == Signal.UP))
+					|| ((bitStorage[(5*i)+4] & 0x01) == 1 && sign == Signal.DOWN)){
+				decoded |= 0x01;
+//				System.out.print(i + ": " + sign);
 				if (sign == Signal.DOWN){
 					sign = Signal.UP;
 				}
 				else{
 					sign = Signal.DOWN;
 				}
+//				System.out.println(i + ": " + Integer.toBinaryString(decoded & 0x1F) + "signal: " + sign);
 			}
 			result[i] = decoded;
 			//System.out.println("\nresult: " + Integer.toBinaryString(result[i] & 0x1F));
-//			System.out.println("\nresult: " + (result[i] & 0x1F));
+			//			System.out.println("\nresult: " + (result[i] & 0x1F));
+			//	System.out.println(Integer.toBinaryString(result[i] & 0x1F));
 		}
 		return result;
+	}
+
+	public static byte[] halfArray(byte[] bitStorage){
+		byte[] halfArray = new byte[bitStorage.length/2];
+		byte combine = 0;
+		for (int i = 0; i < bitStorage.length/2; i++){
+			combine = bitStorage[2*i] <<= 4;
+			combine &= 0xF0;
+			combine = (byte) (combine | bitStorage[2*i+1]);
+			halfArray[i] = (byte) (bitStorage[2*i] | bitStorage[2*i+1]);
+//			System.out.println(i + ": " + (halfArray[i] & 0xFF));
+		}
+		return halfArray;
 	}
 	public static void convert5B4B(byte[] bitStorage){
 		/*		byte fiveBitTable[] = {30, 9, 20, 21, 10, 11, 14, 15,
@@ -157,7 +180,7 @@ public class PhysLayerClient {
 		for (int i = 0; i < bitStorage.length; ++i){
 			temp = fiveBitToFourBit.get(bitStorage[i] & 0x1F);
 			bitStorage[i] = (byte) (temp & 0xF);
-			System.out.println(bitStorage[i] & 0xF);
+			//			System.out.println(bitStorage[i] & 0xF);
 		}
 	}
 }
